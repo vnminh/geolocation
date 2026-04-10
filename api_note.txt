@@ -1,0 +1,85 @@
+[POST] /prediction
+func: upload image to server to get prediction for image 
+body: formdata
+	- image (*)
+return:
+	- success
+	- data:
+		- image_url 
+		- answer
+------------------------------------------------------------
+[POST] /user/signup
+func: add new user account 
+body:
+	- email (*)
+	- name (*)
+	- password (*)
+	- role (*)
+return:
+	- success
+	- data:
+		- id
+		- name
+		- role
+------------------------------------------------------------
+[POST] /user/signin
+funt: check credential 
+body:
+	- email (*)
+	- password (*)
+return:
+	- success
+	- data:
+		- id
+		- name
+		- role
+------------------------------------------------------------
+[PATCH] /profile
+func: update user info
+body:
+	- id (*)
+	- password
+	- name
+	- role
+return:
+	- success
+	- data:
+		- id
+		- name
+		- role
+NOTE: at least 1 in 3 parameter [password, name, role] is not None 
+------------------------------------------------------------
+[POST] /password
+func: reset password
+body:
+	- id
+return:
+	- success
+	- data:
+		- id
+		- name
+		- role
+------------------------------------------------------------
+[PATCH] /request/:id
+func: update request status
+body:
+	- status (*)
+	- user_id (*)
+return:
+	- success
+	- data:
+		- id
+------------------------------------------------------------
+[POST] /request
+func: add request
+body:
+	- user_id (*)
+	- image_url (*)
+	- cot (*)
+	- lat (*)
+	- lon (*)
+return:
+	- success
+	- data:
+		- id
+
