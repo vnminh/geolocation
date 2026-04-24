@@ -11,6 +11,8 @@ class Envelope(BaseModel):
 class PredictionAnswer(BaseModel):
     lat: float | None = None
     lon: float | None = None
+    location: str | None = None
+    type: str | None = None
     cot: str
     model_output: str | None = None
 
@@ -18,6 +20,13 @@ class PredictionAnswer(BaseModel):
 class PredictionData(BaseModel):
     image_url: str
     answer: PredictionAnswer
+    is_deleted: bool = False
+    request_id: int | None = None
+
+
+class PredictionDeleteData(BaseModel):
+    id: int
+    is_deleted: bool
 
 
 class UserSignupIn(BaseModel):
@@ -36,6 +45,9 @@ class UserOut(BaseModel):
     id: int
     name: str
     role: Literal["user", "admin"]
+    status: Literal["active", "block"]
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class ProfilePatchIn(BaseModel):
@@ -43,11 +55,12 @@ class ProfilePatchIn(BaseModel):
     password: str | None = None
     name: str | None = None
     role: Literal["user", "admin"] | None = None
+    status: Literal["active", "block"] | None = None
 
     @model_validator(mode="after")
     def validate_any_update(self) -> "ProfilePatchIn":
-        if all(value is None for value in [self.password, self.name, self.role]):
-            raise ValueError("At least one of password, name, role must be provided")
+        if all(value is None for value in [self.password, self.name, self.role, self.status]):
+            raise ValueError("At least one of password, name, role, status must be provided")
         return self
 
 
@@ -56,11 +69,7 @@ class ResetPasswordIn(BaseModel):
 
 
 class RequestCreateIn(BaseModel):
-    user_id: int
-    image_url: str
-    cot: str | None = None
-    lat: float
-    lon: float
+    prediction_id: int
 
 
 class RequestUpdateIn(BaseModel):
@@ -68,5 +77,42 @@ class RequestUpdateIn(BaseModel):
     user_id: int
 
 
+class RequestPatchIn(BaseModel):
+    id: int
+    status: Literal["decline", "reviewing", "accepted"] | None = None
+    user_id: int | None = None
+    updated_lat: float | None = None
+    updated_lon: float | None = None
+    location: str | None = None
+    updated_cot: str | None = None
+
+    @model_validator(mode="after")
+    def validate_patch_payload(self) -> "RequestPatchIn":
+        has_update = any(
+            value is not None
+            for value in [
+                self.status,
+                self.updated_lat,
+                self.updated_lon,
+                self.location,
+                self.updated_cot,
+            ]
+        )
+        if not has_update:
+            raise ValueError("At least one updatable field must be provided")
+        if self.status is not None and self.user_id is None:
+            raise ValueError("user_id is required when updating status")
+        return self
+
+
+class RequestAutoCorrectIn(BaseModel):
+    request_id: int
+    user_id: int
+
+
 class RequestIdOut(BaseModel):
     id: int
+
+
+class HistoryQueryIn(BaseModel):
+    user_id: int

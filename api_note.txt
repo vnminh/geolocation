@@ -7,6 +7,38 @@ return:
 	- data:
 		- image_url 
 		- answer
+			- type (duplicate_image | new_image_known_location | new_location_request | mock)
+		- request_id (nullable, created when type = new_location_request)
+------------------------------------------------------------
+[POST] /prediction/stream
+func: stream full prediction pipeline (retrieval stage, predict stage, answer tokens)
+body: formdata
+	- image (*)
+return: text/event-stream (SSE)
+	events:
+	- start: { success, image_url }
+	- stage: { name: retrieval|predict, status: started|thinking|completed, ... }
+	- final: { success, data: { image_url, answer } }
+	- done: { success: true }
+	- error: { success: false, detail }
+------------------------------------------------------------
+[GET] /history
+func: get prediction history by user
+query:
+	- user_id (*)
+	- limit
+	- page
+return:
+	- success
+	- data:
+		- items
+			- id
+			- user_id
+			- image_url
+			- cot
+			- lat
+			- lon
+			- created_at
 ------------------------------------------------------------
 [POST] /user/signup
 func: add new user account 
@@ -20,7 +52,11 @@ return:
 	- data:
 		- id
 		- name
+		- email
 		- role
+		- status
+		- created_at
+		- updated_at
 ------------------------------------------------------------
 [POST] /user/signin
 funt: check credential 
@@ -32,7 +68,28 @@ return:
 	- data:
 		- id
 		- name
+		- email
 		- role
+		- status
+		- created_at
+		- updated_at
+------------------------------------------------------------
+[GET] /user
+func: get all users
+query:
+	- limit
+	- page
+return:
+	- success
+	- data:
+		- items
+			- id
+			- name
+			- email
+			- role
+			- status
+			- created_at
+			- updated_at
 ------------------------------------------------------------
 [PATCH] /profile
 func: update user info
@@ -41,13 +98,18 @@ body:
 	- password
 	- name
 	- role
+	- status
 return:
 	- success
 	- data:
 		- id
 		- name
+		- email
 		- role
-NOTE: at least 1 in 3 parameter [password, name, role] is not None 
+		- status
+		- created_at
+		- updated_at
+NOTE: at least 1 in 4 parameter [password, name, role, status] is not None 
 ------------------------------------------------------------
 [POST] /password
 func: reset password
@@ -58,7 +120,34 @@ return:
 	- data:
 		- id
 		- name
+		- email
 		- role
+		- status
+		- created_at
+		- updated_at
+------------------------------------------------------------
+[GET] /request
+func: get all upsert requests
+query:
+	- limit
+	- page
+return:
+	- success
+	- data:
+		- items
+			- id
+			- prediction_id
+			- user_id
+			- image_url
+			- cot
+			- location
+			- lat
+			- lon
+			- prediction_created_at
+			- status
+			- accepted_by
+			- created_at
+			- updated_at
 ------------------------------------------------------------
 [PATCH] /request/:id
 func: update request status
@@ -76,6 +165,7 @@ body:
 	- user_id (*)
 	- image_url (*)
 	- cot (*)
+	- location
 	- lat (*)
 	- lon (*)
 return:
