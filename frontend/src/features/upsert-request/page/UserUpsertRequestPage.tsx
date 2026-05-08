@@ -81,6 +81,15 @@ export function UserUpsertRequestPage() {
     setFeedback({ open: true, variant, title, message });
   };
 
+  const hasUnsavedEdits = Boolean(
+    editSelected && (
+      editUpdatedLat.trim() !== String(editSelected.updated_lat).trim()
+      || editUpdatedLon.trim() !== String(editSelected.updated_lon).trim()
+      || editUpdatedCot.trim() !== (editSelected.updated_cot ?? "").trim()
+      || editLocation.trim() !== (editSelected.location ?? "").trim()
+    ),
+  );
+
   const applyStatus = async (requestId: number, status: RequestStatus) => {
     try {
       const updated = await statusUpdate.updateStatus(requestId, {
@@ -100,6 +109,10 @@ export function UserUpsertRequestPage() {
 
   const handleDecision = async (status: Extract<RequestStatus, "accepted" | "decline">) => {
     if (!editSelected) {
+      return;
+    }
+    if (status === "accepted" && hasUnsavedEdits) {
+      showFeedback("error", "Save Required", "You need to save before accept.");
       return;
     }
     await applyStatus(editSelected.id, status);
@@ -407,24 +420,24 @@ export function UserUpsertRequestPage() {
                 <div className="field" style={{ display: "grid", gap: 8 }}>
                   <label>
                     Lat
-                    <input value={editUpdatedLat} onChange={(e) => setEditUpdatedLat(e.target.value)} disabled={statusUpdate.loading} />
+                    <input value={editUpdatedLat} onChange={(e) => setEditUpdatedLat(e.target.value)} disabled={statusUpdate.loading || editSelected.status!=='reviewing'} />
                   </label>
                   <label>
                     Lon
-                    <input value={editUpdatedLon} onChange={(e) => setEditUpdatedLon(e.target.value)} disabled={statusUpdate.loading} />
+                    <input value={editUpdatedLon} onChange={(e) => setEditUpdatedLon(e.target.value)} disabled={statusUpdate.loading || editSelected.status!=='reviewing'} />
                   </label>
                   <label>
                     Cot
                     <textarea
                       value={editUpdatedCot}
                       onChange={(e) => setEditUpdatedCot(e.target.value)}
-                      disabled={statusUpdate.loading}
+                      disabled={statusUpdate.loading || editSelected.status!=='reviewing'}
                       rows={5}
                     />
                   </label>
                   <label>
                     Location
-                    <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} disabled={statusUpdate.loading} />
+                    <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} disabled={statusUpdate.loading || editSelected.status!=='reviewing'} />
                   </label>
                 </div>
               </div>
@@ -432,16 +445,23 @@ export function UserUpsertRequestPage() {
               {formError && <ErrorState message={formError} />}
 
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-                <button type="button" onClick={handleAutoCorrect} disabled={statusUpdate.loading}>
+                <button type="button" onClick={handleAutoCorrect} disabled={statusUpdate.loading || editSelected.status!=='reviewing'}>
                   Auto Correct (GPT-4o)
                 </button>
-                <button type="button" onClick={handleSavePatch} disabled={statusUpdate.loading}>
+                <button type="button" onClick={handleSavePatch} disabled={statusUpdate.loading || editSelected.status!=='reviewing'}>
                   Save
                 </button>
-                <button type="button" onClick={() => handleDecision("decline")} disabled={statusUpdate.loading}>
+                <button type="button" onClick={() => handleDecision("decline")} disabled={statusUpdate.loading || editSelected.status!=='reviewing'}>
                   Decline
                 </button>
-                <button type="button" onClick={() => handleDecision("accepted")} disabled={statusUpdate.loading}>
+                <button
+                  type="button"
+                  onClick={() => handleDecision("accepted")}
+                  disabled={statusUpdate.loading || editSelected.status !== "reviewing"}
+                  aria-disabled={hasUnsavedEdits || statusUpdate.loading || editSelected.status !== "reviewing"}
+                  title={hasUnsavedEdits ? "You need to save before accept." : undefined}
+                  style={hasUnsavedEdits ? { opacity: 0.58, cursor: "not-allowed", boxShadow: "none" } : undefined}
+                >
                   Accept
                 </button>
               </div>

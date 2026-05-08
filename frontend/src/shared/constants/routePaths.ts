@@ -8,4 +8,5 @@ export const routePaths = {
   userHistory: "/user/history",
   userUpsertRequest: "/user/upsert-request",
   userManagement: "/user/user-management",
+  knowledge: "/user/knowledge",
 } as const;

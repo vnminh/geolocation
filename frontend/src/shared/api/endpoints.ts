@@ -9,4 +9,5 @@ export const endpoints = {
   predictionStream: "/prediction/stream",
   history: "/history",
   request: "/request",
+  knowledge: "/knowledge",
 };

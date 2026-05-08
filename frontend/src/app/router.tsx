@@ -13,6 +13,7 @@ import { UserTaggingRoute } from "../routes/user/tagging/UserTaggingRoute";
 import { UserMapRoute } from "../routes/user/map/UserMapRoute";
 import { UserHistoryRoute } from "../routes/user/history/UserHistoryRoute";
 import { UserUpsertRequestRoute } from "../routes/user/upsert-request/UserUpsertRequestRoute";
+import { KnowledgeManagementRoute } from "../routes/user/knowledge/KnowledgeManagementRoute";
 
 function RootRedirect() {
   const user = getSessionUser();
@@ -81,6 +82,16 @@ export const router = createBrowserRouter([
               {
                 path: "",
                 element: <UserManagementRoute />,
+              },
+            ],
+          },
+          {
+            path: routePaths.knowledge,
+            element: <AppShell />,
+            children: [
+              {
+                path: "",
+                element: <KnowledgeManagementRoute />,
               },
             ],
           },

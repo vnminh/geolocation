@@ -108,24 +108,28 @@ def _ensure_vlm_runtime() -> None:
         device_map="auto" if device.startswith("cuda") else "cpu",
         dtype=model_dtype,
     )
-
+    print('[INFO] Load base model success')
+    
     sftModel = PeftModel.from_pretrained(
         model=base_model,
         model_id="leevox/sftGRE",
         is_trainable=False,
     ).merge_and_unload()
+    print('[INFO] Load sft model success')
 
     s1_model = PeftModel.from_pretrained(
         model=sftModel,
         model_id="leevox/stage1GRE",
         is_trainable=False,
     ).merge_and_unload()
+    print('[INFO] Load stage1 model success')
 
     s2_model = PeftModel.from_pretrained(
         model=s1_model,
         model_id="leevox/stage2GRE",
         is_trainable=False,
     ).merge_and_unload()
+    print('[INFO] Load stage2 model success')
 
     processor = AutoProcessor.from_pretrained(MODEL_ID)
 

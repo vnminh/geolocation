@@ -241,6 +241,7 @@ class PipelineService:
         payload_location: str,
         infer_lat: float,
         infer_lon: float,
+        payload_image_url: str,
     ) -> bool:
         if self.qdrant_client is None:
             return False
@@ -256,6 +257,7 @@ class PipelineService:
                 "lat": float(infer_lat),
                 "lon": float(infer_lon),
                 "location": payload_location,
+                "url": payload_image_url,
                 "source": "auto_ingest_known_location",
             },
         )
@@ -376,6 +378,7 @@ class PipelineService:
             payload_location=payload_location,
             infer_lat=float(lat),
             infer_lon=float(lon),
+            payload_image_url=image_url,
         )
 
     def _staged_retrieval(self, query_img: Image.Image) -> dict[str, Any]:
@@ -422,8 +425,8 @@ class PipelineService:
         stage1 = self.qdrant_client.query_points(
             collection_name=settings.qdrant_collection,
             query=q_geoclip_img.tolist(),
-            using="geoclip_loc_emb",
-            limit=50,
+            using="geoclip_img_emb",
+            limit=100,
             timeout=300,
             with_vectors=["dino_emb"],
             with_payload=True,
@@ -440,7 +443,7 @@ class PipelineService:
             dino_vec = np.array(dino_raw, dtype=np.float32)
             visual_score = self._dot(q_dino, dino_vec)
             geoloc_score = candidate.score
-            score = 0.7*geoloc_score + 0.3*visual_score
+            score = 0.3*geoloc_score + 0.7*visual_score
             stage2.append(
                 {
                     "id": candidate.id,

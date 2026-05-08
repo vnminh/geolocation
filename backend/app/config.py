@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     resend_from_email: str = "Geo Tagging <onboarding@resend.dev>"
 
     # Optional model + vector DB configs
-    qdrant_url: str | None = None
+    qdrant_url: str | None = "http://localhost:6333"
     qdrant_api_key: str | None = None
     qdrant_collection: str = "mp16_geo_multistage"
 

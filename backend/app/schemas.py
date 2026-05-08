@@ -29,6 +29,10 @@ class PredictionDeleteData(BaseModel):
     is_deleted: bool
 
 
+class KnowledgeDeleteIn(BaseModel):
+    id: str = Field(min_length=1)
+
+
 class UserSignupIn(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1)

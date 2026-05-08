@@ -28,6 +28,7 @@ export function Sidebar({ publicMode = false }: SidebarProps) {
             <Link to={routePaths.userSettings}>Settings</Link>
             {user?.role === "admin" && <Link to={routePaths.userUpsertRequest}>Upsert Requests</Link>}
             {user?.role === "admin" && <Link to={routePaths.userManagement}>User Management</Link>}
+            {user?.role === "admin" && <Link to={routePaths.knowledge}>Knowledge Management</Link>}
           </>
         )}
       </nav>
