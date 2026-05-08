@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { API_BASE_URL } from "../../../shared/api/client";
 import { endpoints } from "../../../shared/api/endpoints";
-import { getSessionUser } from "../../../shared/auth/token";
 import {
   PredictionData,
   PredictionResponse,
@@ -104,21 +103,15 @@ export function usePredictionStream() {
     }
   };
 
-  const runStream = async (file: File) => {
+  const runStream = async (file: File, user_id: number) => {
     setState({ ...initialState, loading: true });
 
     const formData = new FormData();
     formData.append("image", file);
-
-    const user = getSessionUser();
-    const headers = new Headers();
-    if (user) {
-      headers.set("Authorization", `Bearer fake-session-${user.id}`);
-    }
+    formData.append("user_id", String(user_id));
 
     const response = await fetch(`${API_BASE_URL}${endpoints.predictionStream}`, {
       method: "POST",
-      headers,
       body: formData,
     });
 

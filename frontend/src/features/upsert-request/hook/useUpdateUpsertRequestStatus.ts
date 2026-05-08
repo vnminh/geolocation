@@ -28,7 +28,7 @@ export function useUpdateUpsertRequestStatus() {
     } catch (err) {
       const detail = err && typeof err === "object" && "detail" in err ? String((err as { detail: string }).detail) : "Update failed";
       setError(detail);
-      return null;
+      throw new Error(detail);
     } finally {
       setLoading(false);
     }
@@ -46,7 +46,7 @@ export function useUpdateUpsertRequestStatus() {
     } catch (err) {
       const detail = err && typeof err === "object" && "detail" in err ? String((err as { detail: string }).detail) : "Update failed";
       setError(detail);
-      return null;
+      throw new Error(detail);
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export function useUpdateUpsertRequestStatus() {
     } catch (err) {
       const detail = err && typeof err === "object" && "detail" in err ? String((err as { detail: string }).detail) : "Update failed";
       setError(detail);
-      return null;
+      throw new Error(detail);
     } finally {
       setLoading(false);
     }

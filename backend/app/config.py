@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     openai_timeout_seconds: float = 90.0
 
+    resend_api_key: str | None = None
+    resend_from_email: str = "Geo Tagging <onboarding@resend.dev>"
+
     # Optional model + vector DB configs
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None

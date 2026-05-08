@@ -21,3 +21,4 @@ opencv-python
 huggingface-hub
 modal
 openai
+resend

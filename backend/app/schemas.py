@@ -68,6 +68,10 @@ class ResetPasswordIn(BaseModel):
     id: int
 
 
+class ForgetPasswordIn(BaseModel):
+    email: EmailStr
+
+
 class RequestCreateIn(BaseModel):
     prediction_id: int
 

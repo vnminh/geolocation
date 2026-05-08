@@ -47,6 +47,9 @@ export function SigninPage() {
           </button>
           {error && <ErrorState message={error} />}
         </form>
+        <p className="small" style={{ marginBottom: 0 }}>
+          <Link to={routePaths.forgetPass}>Forgot password?</Link>
+        </p>
         <p className="small">
           No account? <Link to={routePaths.signup}>Create one</Link>
         </p>

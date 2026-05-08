@@ -23,6 +23,7 @@ export function Sidebar({ publicMode = false }: SidebarProps) {
         ) : (
           <>
             <Link to={routePaths.userTagging}>Tagging Chat</Link>
+            <Link to={routePaths.userMap}>Map</Link>
             <Link to={routePaths.userHistory}>My History</Link>
             <Link to={routePaths.userSettings}>Settings</Link>
             {user?.role === "admin" && <Link to={routePaths.userUpsertRequest}>Upsert Requests</Link>}

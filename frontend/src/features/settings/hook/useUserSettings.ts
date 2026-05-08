@@ -9,12 +9,16 @@ import { ProfilePatchRequest, ProfileResponse, ResetPasswordResponse } from "../
 export function useUserSettings() {
   const { user, signIn } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  const updateProfile = async (payload: Omit<ProfilePatchRequest, "id">) => {
+  const updateProfile = async (
+    payload: Omit<ProfilePatchRequest, "id">,
+  ): Promise<{ success: boolean; error?: string } | undefined> => {
     if (!user) return;
     setLoading(true);
+    setUpdateLoading(true);
     setError(null);
     setMessage(null);
     try {
@@ -24,16 +28,21 @@ export function useUserSettings() {
       });
       signIn(result);
       setMessage("Profile updated.");
+      return { success: true };
     } catch (err) {
-      setError((err as ApiError).detail ?? "Profile update failed");
+      const e = (err as ApiError).detail ?? "Profile update failed";
+      setError(e);
+      return { success: false, error: e };
     } finally {
       setLoading(false);
+      setUpdateLoading(false);
     }
   };
 
-  const resetPassword = async () => {
+  const resetPassword = async (): Promise<{ success: boolean; error?: string } | undefined> => {
     if (!user) return;
     setLoading(true);
+    setResetLoading(true);
     setError(null);
     setMessage(null);
     try {
@@ -42,12 +51,16 @@ export function useUserSettings() {
         body: JSON.stringify({ id: user.id }),
       });
       setMessage("Password reset was triggered.");
+      return { success: true };
     } catch (err) {
-      setError((err as ApiError).detail ?? "Reset password failed");
+      const e = (err as ApiError).detail ?? "Reset password failed";
+      setError(e);
+      return { success: false, error: e };
     } finally {
       setLoading(false);
+      setResetLoading(false);
     }
   };
 
-  return { user, loading, error, message, updateProfile, resetPassword };
+  return { user, loading, updateLoading, resetLoading, error, message, updateProfile, resetPassword };
 }

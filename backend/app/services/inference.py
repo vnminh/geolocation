@@ -73,12 +73,12 @@ def build_retrieval_context_from_top(top: list[dict[str, Any]]) -> str:
     for i, item in enumerate(top, 1):
         payload = item.get("payload", {})
         lines.append(f"\\n[Rank {i}]")
-        lines.append(f"  Visual similarity: ({item.get('dino_score')})")
-        lines.append(f"  Geolocation similarity: ({item.get('geoclip_score')})")
+        lines.append(f"  Visual similarity: ({item.get('visual_score')})")
+        lines.append(f"  Geolocation similarity: ({item.get('geoloc_score')})")
         if payload.get("location"):
             lines.append(f"  Location: {payload.get('location')}")
-        lines.append(f"  Coordinates: (lat:{payload.get('lat')}, lon:{payload.get('lon')})")
-    lines.append("\\nUse these references as additional context clues to help determine the location.")
+        lines.append(f"  Latitude: {payload.get('lat')}, Longitude: {payload.get('lon')})")
+    lines.append("\\nUse these references as additional clues to help determine the location. Treat them as hints only; do not rely on them as definitive evidence.")
     return "\n".join(lines)
 
 
@@ -214,7 +214,7 @@ class PipelineService:
         return r * c
 
     @staticmethod
-    def _mean_top_answer(cands: list[dict[str, Any]], k: int = 5) -> dict[str, Any]:
+    def _mean_top_answer(cands: list[dict[str, Any]], k: int = 3) -> dict[str, Any]:
         top = cands[:k]
         if not top:
             return {"top": [], "variance_km": None}
@@ -245,54 +245,22 @@ class PipelineService:
         if self.qdrant_client is None:
             return False
         
-        # point = qdrant_models.PointStruct(
-        #     id=str(uuid4()),
-        #     vector={
-        #         "geoclip_img_emb": img_vector.astype(np.float32).tolist(),
-        #         "geoclip_loc_emb": loc_vector.astype(np.float32).tolist(),
-        #         "dino_emb": dino_vector.astype(np.float32).tolist(),
-        #     },
-        #     payload={
-        #         "lat": float(infer_lat),
-        #         "lon": float(infer_lon),
-        #         "location": payload_location,
-        #         "source": "auto_ingest_known_location",
-        #     },
-        # )
-        # self.qdrant_client.upsert(collection_name=settings.qdrant_collection, points=[point], wait=False)
-        return True
-
-    def _upsert_after_inference(self, retrieval_ans: dict[str, Any], infer_result: PredictionResult) -> bool:
-        if self.qdrant_client is None:
-            return False
-        if infer_result.lat is None or infer_result.lon is None:
-            return False
-
-        query_img_vec = retrieval_ans.get("query_img_vec")
-        infer_lat = float(infer_result.lat)
-        infer_lon = float(infer_result.lon)
-        query_img_loc_vec = self._geoclip_embed_location(infer_lat, infer_lon)
-        dino_vec = retrieval_ans.get("context_vec")
-        if not isinstance(query_img_vec, np.ndarray):
-            return False
-
-        top_candidates = retrieval_ans.get("top", []) if isinstance(retrieval_ans.get("top", []), list) else []
-        payload_location = "auto-known-location"
-        for item in top_candidates:
-            payload = item.get("payload") or {}
-            loc_name = payload.get("location")
-            if loc_name:
-                payload_location = str(loc_name)
-                break
-
-        return self._upsert_known_location_point(
-            img_vector=query_img_vec,
-            loc_vector=query_img_loc_vec,
-            dino_vector=dino_vec,
-            payload_location=payload_location,
-            infer_lat=float(infer_result.lat),
-            infer_lon=float(infer_result.lon),
+        point = qdrant_models.PointStruct(
+            id=str(uuid4()),
+            vector={
+                "geoclip_img_emb": img_vector.astype(np.float32).tolist(),
+                "geoclip_loc_emb": loc_vector.astype(np.float32).tolist(),
+                "dino_emb": dino_vector.astype(np.float32).tolist(),
+            },
+            payload={
+                "lat": float(infer_lat),
+                "lon": float(infer_lon),
+                "location": payload_location,
+                "source": "auto_ingest_known_location",
+            },
         )
+        self.qdrant_client.upsert(collection_name=settings.qdrant_collection, points=[point], wait=False)
+        return True
 
     def _resolve_local_image_path(self, image_url: str) -> Path | None:
         image_url = str(image_url).strip()
@@ -420,8 +388,8 @@ class PipelineService:
 
         duplicate_top = self.qdrant_client.query_points(
             collection_name=settings.qdrant_collection,
-            query=q_geoclip_img.tolist(),
-            using="geoclip_img_emb",
+            query=q_dino.tolist(),
+            using="dino_emb",
             limit=1,
             timeout=300,
             with_payload=True,
@@ -436,13 +404,14 @@ class PipelineService:
             top = [
                 {
                     "id": duplicate_top[0].id,
-                    "geoclip_score": duplicate_top[0].score,
-                    "dino_score": duplicate_top[0].score,
+                    "geoloc_score": duplicate_top[0].score,
+                    "visual_score": duplicate_top[0].score,
+                    "score": duplicate_top[0].score,
                     "payload": payload,
                 }
             ]
             return {
-                "type": "duplicate_image",
+                "type": "old location",
                 "top": top,
                 "mean_lat": float(lat) if lat is not None else None,
                 "mean_lon": float(lon) if lon is not None else None,
@@ -456,7 +425,7 @@ class PipelineService:
             using="geoclip_loc_emb",
             limit=50,
             timeout=300,
-            with_vectors=["geoclip_img_emb"],
+            with_vectors=["dino_emb"],
             with_payload=True,
             score_threshold=0.3,
         ).points
@@ -464,38 +433,30 @@ class PipelineService:
         stage2: list[dict[str, Any]] = []
         for candidate in stage1:
             vector_map = candidate.vector or {}
-            geoclip_img_raw = vector_map.get("geoclip_img_emb") if isinstance(vector_map, dict) else None
-            if geoclip_img_raw is None:
+            dino_raw = vector_map.get("dino_emb") if isinstance(vector_map, dict) else None
+            if dino_raw is None:
                 continue
 
-            geoclip_img_vec = np.array(geoclip_img_raw, dtype=np.float32)
-            visual_score = self._dot(q_geoclip_img, geoclip_img_vec)
+            dino_vec = np.array(dino_raw, dtype=np.float32)
+            visual_score = self._dot(q_dino, dino_vec)
+            geoloc_score = candidate.score
+            score = 0.7*geoloc_score + 0.3*visual_score
             stage2.append(
                 {
                     "id": candidate.id,
-                    "geoloc_score": candidate.score,
+                    "geoloc_score": geoloc_score,
                     "visual_score": visual_score,
+                    "score": score,
                     "payload": candidate.payload or {},
                 }
             )
 
-        stage2 = sorted(stage2, key=lambda x: x["visual_score"], reverse=True)
+        stage2 = sorted(stage2, key=lambda x: x["score"], reverse=True)
         retrieval = self._mean_top_answer(stage2)
         retrieval["query_img_vec"] = q_geoclip_img
         retrieval["context_vec"] = q_dino
 
-        variance_km = retrieval.get("variance_km")
-        if not retrieval.get("top"):
-            retrieval["type"] = "new_location_request"
-            retrieval["upserted"] = False
-            return retrieval
-
-        if variance_km is not None and float(variance_km) < 50:
-            retrieval["type"] = "new_image_known_location"
-            retrieval["upserted"] = False
-            return retrieval
-
-        retrieval["type"] = "new_location_request"
+        retrieval["type"] = "new location"
         retrieval["upserted"] = False
         return retrieval
 
@@ -705,7 +666,7 @@ class PipelineService:
             lat=lat,
             lon=lon,
             location=location,
-            type="new_location_request",
+            type="new location",
             cot=cot,
             model_output=model_output,
         )
@@ -760,8 +721,8 @@ class PipelineService:
             if (result.lat is None or result.lon is None) and retrieval_ans:
                 result.lat = float(retrieval_ans.get("mean_lat")) if retrieval_ans.get("mean_lat") is not None else result.lat
                 result.lon = float(retrieval_ans.get("mean_lon")) if retrieval_ans.get("mean_lon") is not None else result.lon
-            if retrieval_type == "new_location_request":
-                result.type = "new_location_request"
+            if retrieval_type in {"old location", "new location"}:
+                result.type = retrieval_type
             if not result.type:
                 result.type = retrieval_type or "retrieval_backed"
             if not result.cot:
@@ -795,14 +756,11 @@ class PipelineService:
 
         if self.enable_real_models:
             result = self._run_real_pipeline(image, retrieval_ans=retrieval_ans, retrieval_context=retrieval_context)
-            retrieval_type = str(retrieval_ans.get("type", "")) if isinstance(retrieval_ans, dict) else ""
-            if retrieval_type == "new_image_known_location":
-                retrieval_ans["upserted"] = self._upsert_after_inference(retrieval_ans, result)
             return result
 
         logger.warning("Prediction running in mock mode (ENABLE_REAL_MODELS=false); GPT4o is not invoked")
         model_output = (
-            "<think>This is mock pipeline emulating inference flow with retrieval context and coordinate extraction fallback.</think>\n"
+            f"<think>{'This is mock pipeline emulating inference flow with retrieval context and coordinate extraction fallback.'*10}</think>\n"
             f"<answer>{retrieval_ans.get('mean_lat', 0.0):.6f}, {retrieval_ans.get('mean_lon', 0.0):.6f}</answer>"
         )
 

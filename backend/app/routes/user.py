@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app.schemas import Envelope, ProfilePatchIn, ResetPasswordIn, UserSigninIn, UserSignupIn
+from app.schemas import Envelope, ForgetPasswordIn, ProfilePatchIn, ResetPasswordIn, UserSigninIn, UserSignupIn
 from app.services.auth import generate_temp_password, hash_password, verify_password
+from app.services.mail import send_temporary_password_email
 
 router = APIRouter(tags=["user"])
 
@@ -74,6 +75,14 @@ def signin(payload: UserSigninIn, db: Session = Depends(get_db)) -> Envelope:
     return Envelope(success=True, data=_serialize_user(user))
 
 
+def _reset_password_for_user(db: Session, user: User) -> User:
+    temp_password = generate_temp_password(10)
+    user.password = hash_password(temp_password)
+    db.flush()
+    send_temporary_password_email(user.email, temp_password)
+    return user
+
+
 @router.patch("/profile", response_model=Envelope)
 def update_profile(payload: ProfilePatchIn, db: Session = Depends(get_db)) -> Envelope:
     user = db.query(User).filter(User.id == payload.id).first()
@@ -100,11 +109,33 @@ def reset_password(payload: ResetPasswordIn, db: Session = Depends(get_db)) -> E
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # temp_password = generate_temp_password()
-    temp_password = "123456"
-    user.password = hash_password(temp_password)
-    db.commit()
-    db.refresh(user)
+    try:
+        _reset_password_for_user(db, user)
+        db.commit()
+        db.refresh(user)
+    except Exception as exc:
+        db.rollback()
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail="Failed to reset password") from exc
 
-    # Intentionally not returning temp password to keep API surface consistent with api_note.
+    return Envelope(success=True, data=_serialize_user(user))
+
+
+@router.post("/user/forget-password", response_model=Envelope)
+def forget_password(payload: ForgetPasswordIn, db: Session = Depends(get_db)) -> Envelope:
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        _reset_password_for_user(db, user)
+        db.commit()
+        db.refresh(user)
+    except Exception as exc:
+        db.rollback()
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail="Failed to send temporary password") from exc
+
     return Envelope(success=True, data=_serialize_user(user))

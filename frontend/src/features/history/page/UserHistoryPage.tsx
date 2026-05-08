@@ -1,17 +1,28 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 
+import { ActionStatusModal } from "../../../shared/components/feedback/ActionStatusModal";
 import { ErrorState } from "../../../shared/components/feedback/ErrorState";
 import { Loading } from "../../../shared/components/feedback/Loading";
 import { PaginationControls } from "../../../shared/components/layout/PaginationControls";
+import { routePaths } from "../../../shared/constants/routePaths";
 import { HistoryRow } from "../dto/history.dto";
 import { useUserHistory } from "../hook/useUserHistory";
 
+type FeedbackState = {
+  open: boolean;
+  title: string;
+  message: string;
+  variant: "success" | "error";
+};
+
 export function UserHistoryPage() {
+  const navigate = useNavigate();
   const { rows, page, limit, total, totalPages, setPage, setLimit, loading, error, deletePrediction } = useUserHistory();
   const [selected, setSelected] = useState<HistoryRow | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   const formatDateTime = (value: string | null) => {
     if (!value) {
@@ -30,18 +41,36 @@ export function UserHistoryPage() {
     }
 
     const targetId = selected.id;
-    setDeleteError(null);
     setDeletingId(targetId);
     setSelected(null);
 
     try {
       await deletePrediction(targetId);
+      setFeedback({
+        open: true,
+        variant: "success",
+        title: "Delete Completed",
+        message: `Prediction #${targetId} was deleted successfully.`,
+      });
     } catch (err) {
-      const detail = err && typeof err === "object" && "detail" in err ? String((err as { detail: string }).detail) : "Delete prediction failed";
-      setDeleteError(detail);
+      const detail = err instanceof Error ? err.message : err && typeof err === "object" && "detail" in err ? String((err as { detail: string }).detail) : "Delete prediction failed";
+      setFeedback({
+        open: true,
+        variant: "error",
+        title: "Delete Failed",
+        message: detail,
+      });
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleViewOnMap = () => {
+    if (!selected) {
+      return;
+    }
+
+    navigate(`${routePaths.userMap}?lat=${selected.lat}&lon=${selected.lon}`);
   };
 
   return (
@@ -49,7 +78,6 @@ export function UserHistoryPage() {
       <h3 style={{ marginTop: 0 }}>Prediction History</h3>
       {loading && <Loading label="Loading history..." />}
       {error && <ErrorState message={error} />}
-      {deleteError && <ErrorState message={deleteError} />}
 
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -136,6 +164,11 @@ export function UserHistoryPage() {
                   <strong>Longitude:</strong> {selected.lon}
                 </p>
                 <div>
+                  <button type="button" onClick={handleViewOnMap}>
+                    View on Map
+                  </button>
+                </div>
+                <div>
                   <strong>COT:</strong>
                   <p style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>{selected.cot || "-"}</p>
                 </div>
@@ -158,6 +191,14 @@ export function UserHistoryPage() {
           </div>,
           document.body,
         )}
+
+      <ActionStatusModal
+        open={Boolean(feedback?.open)}
+        title={feedback?.title ?? ""}
+        message={feedback?.message ?? ""}
+        variant={feedback?.variant ?? "success"}
+        onClose={() => setFeedback(null)}
+      />
     </div>
   );
 }

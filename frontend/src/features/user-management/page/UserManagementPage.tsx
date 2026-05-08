@@ -5,6 +5,7 @@ import { UserRole } from "../../../shared/auth/role";
 import { ErrorState } from "../../../shared/components/feedback/ErrorState";
 import { Loading } from "../../../shared/components/feedback/Loading";
 import { PaginationControls } from "../../../shared/components/layout/PaginationControls";
+import { Modal } from "../../../shared/components/layout/Modal";
 import { UserManagementRow } from "../dto/user-management.dto";
 import { useUserManagement } from "../hook/useUserManagement";
 
@@ -146,73 +147,67 @@ export function UserManagementPage() {
         onLimitChange={setLimit}
       />
 
-      {createOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Create new user">
-          <div className="modal-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h4 style={{ margin: 0 }}>Create New User</h4>
-              <button type="button" onClick={() => setCreateOpen(false)} disabled={createLoading}>
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser} style={{ marginTop: 12, display: "grid", gap: 10 }}>
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label>
-                Name
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                  minLength={6}
-                  required
-                />
-              </label>
-
-              <label>
-                Role
-                <select
-                  value={form.role}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, role: event.target.value as "user" | "admin" }))
-                  }
-                >
-                  <option value="user">user</option>
-                  <option value="admin">admin</option>
-                </select>
-              </label>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button type="button" onClick={() => setCreateOpen(false)} disabled={createLoading}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={createLoading}>
-                  {createLoading ? "Creating..." : "Create"}
-                </button>
-              </div>
-            </form>
-          </div>
+      <Modal open={createOpen} ariaLabel="Create new user">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h4 style={{ margin: 0 }}>Create New User</h4>
+          <button type="button" onClick={() => setCreateOpen(false)} disabled={createLoading}>
+            Close
+          </button>
         </div>
-      )}
+
+        <form onSubmit={handleCreateUser} style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          <label>
+            Email
+            <input
+              type="email"
+              value={form.email}
+              onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+              required
+            />
+          </label>
+
+          <label>
+            Name
+            <input
+              type="text"
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              required
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              type="password"
+              value={form.password}
+              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+              minLength={6}
+              required
+            />
+          </label>
+
+          <label>
+            Role
+            <select
+              value={form.role}
+              onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value as "user" | "admin" }))}
+            >
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </label>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button type="button" onClick={() => setCreateOpen(false)} disabled={createLoading}>
+              Cancel
+            </button>
+            <button type="submit" disabled={createLoading}>
+              {createLoading ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -6,9 +6,10 @@ return:
 	- success
 	- data:
 		- image_url 
+		- is_deleted (default = false)
 		- answer
-			- type (duplicate_image | new_image_known_location | new_location_request | mock)
-		- request_id (nullable, created when type = new_location_request)
+			- type (old location | new location | mock)
+			- request_id (nullable, created when type = new location)
 ------------------------------------------------------------
 [POST] /prediction/stream
 func: stream full prediction pipeline (retrieval stage, predict stage, answer tokens)
@@ -38,7 +39,20 @@ return:
 			- cot
 			- lat
 			- lon
+			- is_deleted
 			- created_at
+
+	NOTE: this list only returns active predictions (is_deleted = false)
+------------------------------------------------------------
+[DELETE] /prediction/:id
+func: soft delete prediction by id
+params:
+	- id (*)
+return:
+	- success
+	- data:
+		- id
+		- is_deleted (true)
 ------------------------------------------------------------
 [POST] /user/signup
 func: add new user account 
@@ -125,6 +139,23 @@ return:
 		- status
 		- created_at
 		- updated_at
+NOTE: generates a temporary 10-character password and sends it by email
+------------------------------------------------------------
+[POST] /user/forget-pass
+func: reset password by email
+body:
+	- email
+return:
+	- success
+	- data:
+		- id
+		- name
+		- email
+		- role
+		- status
+		- created_at
+		- updated_at
+NOTE: generates a temporary 10-character password and sends it by email
 ------------------------------------------------------------
 [GET] /request
 func: get all upsert requests

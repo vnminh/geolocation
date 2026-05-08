@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { ErrorState } from "../../../shared/components/feedback/ErrorState";
+import { routePaths } from "../../../shared/constants/routePaths";
+import { StageRow } from "../../../shared/components/feedback/StageRow";
 import { PredictionData, PredictionStreamStage } from "../dto/tagging.dto";
 import { usePredictionUpload } from "../hook/usePredictionUpload";
 import { usePredictionStream } from "../hook/usePredictionStream";
-
 interface PersistedPredictionView {
   previewUrl: string;
   imageUrl: string;
@@ -12,8 +14,8 @@ interface PersistedPredictionView {
   finalData: PredictionData | null;
   stages: PredictionStreamStage[];
 }
+import { predictionViewKey, useAuth } from "../../../shared/auth/context";
 
-const PREDICTION_VIEW_STORAGE_KEY = "tagging.currentPredictionView";
 
 const EMPTY_PERSISTED_PREDICTION_VIEW: PersistedPredictionView = {
   previewUrl: "",
@@ -36,64 +38,74 @@ const fileToDataUrl = (file: File): Promise<string> =>
     reader.onerror = () => reject(new Error("Cannot read preview image"));
     reader.readAsDataURL(file);
   });
-
-const readPersistedPredictionView = (): PersistedPredictionView => {
-  if (typeof window === "undefined") {
-    return EMPTY_PERSISTED_PREDICTION_VIEW;
-  }
-
-  try {
-    const raw = window.sessionStorage.getItem(PREDICTION_VIEW_STORAGE_KEY);
-    if (!raw) {
+  
+  const readPersistedPredictionView = (key:string): PersistedPredictionView => {
+    if (typeof window === "undefined") {
       return EMPTY_PERSISTED_PREDICTION_VIEW;
     }
-
-    const parsed = JSON.parse(raw) as Partial<PersistedPredictionView>;
-    const stages = Array.isArray(parsed.stages) ? (parsed.stages as PredictionStreamStage[]) : [];
-    const finalData =
+    
+    try {
+      const raw = window.sessionStorage.getItem(key);
+      if (!raw) {
+        return EMPTY_PERSISTED_PREDICTION_VIEW;
+      }
+      
+      const parsed = JSON.parse(raw) as Partial<PersistedPredictionView>;
+      const stages = Array.isArray(parsed.stages) ? (parsed.stages as PredictionStreamStage[]) : [];
+      const finalData =
       parsed.finalData && typeof parsed.finalData === "object"
-        ? (parsed.finalData as PredictionData)
-        : null;
-
-    return {
-      previewUrl: typeof parsed.previewUrl === "string" ? parsed.previewUrl : "",
-      imageUrl: typeof parsed.imageUrl === "string" ? parsed.imageUrl : "",
-      thinkingText: typeof parsed.thinkingText === "string" ? parsed.thinkingText : "",
-      finalData,
-      stages,
-    };
-  } catch {
-    return EMPTY_PERSISTED_PREDICTION_VIEW;
-  }
-};
+      ? (parsed.finalData as PredictionData)
+      : null;
+      
+      return {
+        previewUrl: typeof parsed.previewUrl === "string" ? parsed.previewUrl : "",
+        imageUrl: typeof parsed.imageUrl === "string" ? parsed.imageUrl : "",
+        thinkingText: typeof parsed.thinkingText === "string" ? parsed.thinkingText : "",
+        finalData,
+        stages,
+      };
+    } catch {
+      return EMPTY_PERSISTED_PREDICTION_VIEW;
+    }
+  };
 
 export function UserTaggingPage() {
+  const { user } = useAuth();
+  const storageKey = predictionViewKey(user?.id.toString() ?? "guest");
+  
+  const navigate = useNavigate();
   const { file, previewUrl, setImageFile } = usePredictionUpload();
   const { imageUrl, stages, thinkingText, finalData, loading, error, runStream } = usePredictionStream();
   const [showThinking, setShowThinking] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [savedView, setSavedView] = useState<PersistedPredictionView>(() => readPersistedPredictionView());
-
+  const [savedView, setSavedView] = useState<PersistedPredictionView>(
+    () => readPersistedPredictionView(storageKey),
+  );
+  
   const savedPreviewUrl = savedView.previewUrl;
   const savedImageUrl = savedView.imageUrl;
   const savedThinkingText = savedView.thinkingText;
   const savedFinalData = savedView.finalData;
   const savedStages = savedView.stages;
-
+  
   const currentPreviewUrl = previewUrl || savedPreviewUrl;
   const currentImageUrl = imageUrl || savedImageUrl;
   const currentThinkingText = thinkingText || savedThinkingText;
   const currentFinalData = finalData || savedFinalData;
   const currentStages = stages.length ? stages : savedStages;
-
+  
   const isFirstUse =
-    !file &&
-    !loading &&
-    !currentPreviewUrl &&
+  !file &&
+  !loading &&
+  !currentPreviewUrl &&
     !currentThinkingText.trim() &&
     !currentFinalData &&
     !currentImageUrl &&
     currentStages.length === 0;
+
+  useEffect(() => {
+    setSavedView(readPersistedPredictionView(storageKey));
+  }, [storageKey]);
 
   useEffect(() => {
     if (previewUrl) {
@@ -144,11 +156,11 @@ export function UserTaggingPage() {
       savedView.stages.length === 0;
 
     if (isEmptySavedView) {
-      window.sessionStorage.removeItem(PREDICTION_VIEW_STORAGE_KEY);
+      window.sessionStorage.removeItem(storageKey);
       return;
     }
 
-    window.sessionStorage.setItem(PREDICTION_VIEW_STORAGE_KEY, JSON.stringify(savedView));
+    window.sessionStorage.setItem(storageKey, JSON.stringify(savedView));
   }, [savedView]);
 
   const retrievalMessage = useMemo(() => {
@@ -173,13 +185,26 @@ export function UserTaggingPage() {
       setLocalError(null);
       setImageFile(nextFile);
       if (nextFile) {
+        if (!user) {
+          throw new Error("Missing user session");
+        }
         const nextPreviewUrl = await fileToDataUrl(nextFile);
         setSavedView({ ...EMPTY_PERSISTED_PREDICTION_VIEW, previewUrl: nextPreviewUrl });
-        await runStream(nextFile);
+        await runStream(nextFile, user.id);
       }
     } catch (err) {
       setLocalError((err as Error).message);
     }
+  };
+
+  const handleViewOnMap = () => {
+    const lat = currentFinalData?.answer.lat;
+    const lon = currentFinalData?.answer.lon;
+    if (lat === null || lat === undefined || lon === null || lon === undefined) {
+      return;
+    }
+
+    navigate(`${routePaths.userMap}?lat=${lat}&lon=${lon}`);
   };
 
   return (
@@ -202,11 +227,40 @@ export function UserTaggingPage() {
             </div>
 
             <div className="claude-msg assistant">
-
               <div className="claude-msg-bubble assistant">
-                <p className="claude-block-title">Retrieval</p>
-                <p className="claude-inline-note">{retrievalMessage}</p>
 
+                {/* Stage tracker */}
+                <div className="stage-tracker">
+                  <StageRow
+                    status="done"
+                    label="Image uploaded"
+                  />
+                  <StageRow
+                    status={!currentStages.find(s => s.name === "retrieval" && s.status === "completed") ? "active" : "done"}
+                    label="Retrieving candidates"
+                    badge={
+                      currentStages.find(s => s.name === "retrieval" && s.status === "completed")
+                        ? `${currentStages.find(s => s.name === "retrieval" && s.status === "completed")?.top_count ?? 0} found`
+                        : undefined
+                    }
+                    showDots={!currentStages.find(s => s.name === "retrieval" && s.status === "completed")}
+                  />
+                  <StageRow
+                    status={
+                      !loading && currentFinalData ? "done"
+                      : loading && !currentThinkingText.trim() ? "active"
+                      : "pending"
+                    }
+                    label="Analyzing location"
+                    showDots={ loading && !currentThinkingText.trim()}
+                  />
+                  <StageRow
+                    status={!loading && currentFinalData ? "done" : "pending"}
+                    label="Finalizing prediction"
+                  />
+                </div>
+
+                {/* Thinking toggle */}
                 {currentThinkingText.trim() && (
                   <div className="claude-thinking-wrap">
                     <div className="claude-thinking-header">
@@ -214,23 +268,30 @@ export function UserTaggingPage() {
                       <button
                         type="button"
                         className="thinking-toggle"
-                        onClick={() => setShowThinking((prev) => !prev)}
-                        aria-label="Toggle thinking stream"
+                        onClick={() => setShowThinking(prev => !prev)}
                       >
                         {showThinking ? "Hide" : "Show"}
                       </button>
                     </div>
-                    {showThinking && <pre className="claude-thinking-stream">{currentThinkingText}</pre>}
+                    {showThinking && (
+                      <pre className="claude-thinking-stream">{currentThinkingText}</pre>
+                    )}
                   </div>
                 )}
+
+                {/* Final result */}
                 {!loading && currentFinalData && (
                   <div className="claude-final-output">
                     <p>lat: {currentFinalData.answer.lat ?? "N/A"}</p>
                     <p>lon: {currentFinalData.answer.lon ?? "N/A"}</p>
+                    {currentFinalData.answer.lat !== null && currentFinalData.answer.lon !== null && (
+                      <button type="button" onClick={handleViewOnMap}>
+                        View on Map
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {currentImageUrl && <p className="small">image: {currentImageUrl}</p>}
                 {(error || localError) && <ErrorState message={error || localError || ""} />}
               </div>
             </div>

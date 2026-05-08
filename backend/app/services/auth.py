@@ -16,6 +16,6 @@ def verify_password(password: str, password_hash: str) -> bool:
     return secrets.compare_digest(digest, expected)
 
 
-def generate_temp_password(length: int = 12) -> str:
+def generate_temp_password(length: int = 10) -> str:
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
     return "".join(secrets.choice(alphabet) for _ in range(length))

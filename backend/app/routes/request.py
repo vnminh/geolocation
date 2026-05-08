@@ -150,7 +150,10 @@ def patch_request(payload: RequestPatchIn, db: Session = Depends(get_db)) -> Env
 
     if payload.updated_cot is not None:
         req.updated_cot = payload.updated_cot
-        req.location = pipeline.extract_locations_from_text(payload.updated_cot)
+        if payload.location is not None:
+            req.location = payload.location
+        elif payload.updated_cot.strip():
+            req.location = pipeline.extract_locations_from_text(payload.updated_cot)
     elif payload.location is not None:
         req.location = payload.location
 

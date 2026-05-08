@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi.concurrency import run_in_threadpool
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
@@ -73,13 +73,12 @@ def _iter_text_tokens(text: str) -> list[str]:
     return re.findall(r"\S+\s*", text)
 
 
-def _save_prediction_and_request_if_needed(result, image_url: str) -> int | None:
-    
+def _save_prediction_and_request_if_needed(result, image_url: str, user_id: int) -> int | None:
     if result.lat is None or result.lon is None:
         return None
 
     with SessionLocal() as db:
-        user = db.query(User).order_by(User.id.asc()).first()
+        user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return None
 
@@ -94,7 +93,7 @@ def _save_prediction_and_request_if_needed(result, image_url: str) -> int | None
         db.flush()
 
         request_id: int | None = None
-        if getattr(result, "type", None) == "new_location_request":
+        if getattr(result, "type", None) == "new location":
             extracted_location = pipeline.extract_locations_from_text(prediction.cot)
             req = DbUpsertReq(
                 prediction_id=int(prediction.id),
@@ -112,7 +111,7 @@ def _save_prediction_and_request_if_needed(result, image_url: str) -> int | None
 
 
 @router.post("/prediction", response_model=Envelope)
-async def prediction(image: UploadFile = File(...)) -> Envelope:
+async def prediction(user_id: int = Form(...), image: UploadFile = File(...)) -> Envelope:
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image")
 
@@ -128,7 +127,7 @@ async def prediction(image: UploadFile = File(...)) -> Envelope:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Inference backend error: {exc}") from exc
     image_url = f"{settings.public_base_url}/uploads/{filename}"
-    request_id = await run_in_threadpool(_save_prediction_and_request_if_needed, result, image_url)
+    request_id = await run_in_threadpool(_save_prediction_and_request_if_needed, result, image_url, user_id)
 
     return Envelope(
         success=True,
@@ -149,7 +148,7 @@ async def prediction(image: UploadFile = File(...)) -> Envelope:
 
 
 @router.post("/prediction/stream")
-async def prediction_stream(image: UploadFile = File(...)) -> StreamingResponse:
+async def prediction_stream(user_id: int = Form(...), image: UploadFile = File(...)) -> StreamingResponse:
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image")
 
@@ -215,7 +214,7 @@ async def prediction_stream(image: UploadFile = File(...)) -> StreamingResponse:
                     "lon": result.lon,
                 },
             )
-            request_id = await run_in_threadpool(_save_prediction_and_request_if_needed, result, image_url)
+            request_id = await run_in_threadpool(_save_prediction_and_request_if_needed, result, image_url, user_id)
             final_payload = Envelope(
                 success=True,
                 data=PredictionData(

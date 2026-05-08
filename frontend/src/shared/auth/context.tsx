@@ -11,6 +11,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+export const predictionViewKey = (userId: string) =>
+  `tagging.currentPredictionView:${userId}`;
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(() => getSessionUser());
 
@@ -23,6 +26,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       signOut: () => {
         clearSessionUser();
+        Object.keys(window.sessionStorage)
+          .filter(k => k.startsWith("tagging.currentPredictionView"))
+          .forEach(k => window.sessionStorage.removeItem(k));
         setUser(null);
       },
     }),
