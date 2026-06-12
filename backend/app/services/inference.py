@@ -443,7 +443,7 @@ class PipelineService:
             dino_vec = np.array(dino_raw, dtype=np.float32)
             visual_score = self._dot(q_dino, dino_vec)
             geoloc_score = candidate.score
-            score = 0.3*geoloc_score + 0.7*visual_score
+            score = 0.7*geoloc_score + 0.3*visual_score
             stage2.append(
                 {
                     "id": candidate.id,
